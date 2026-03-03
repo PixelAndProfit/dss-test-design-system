@@ -151,28 +151,17 @@
 /* ============================================================
    4. BUTTONS
    ─────────────────────────────────────────────────────────────
-   HOW TO USE IN PATTERNS:
-   Put "ds-btn" on the wp:button block itself (the inner div),
+   ds-btn goes on the wp:button block (the inner div.wp-block-button),
    NOT on wp:buttons (the outer wrapper).
 
-   Pattern HTML should look like:
-     <!-- wp:buttons -->
-     <div class="wp-block-buttons">
-       <!-- wp:button {"className":"ds-btn"} -->
-       <div class="wp-block-button ds-btn">
-         <a class="wp-block-button__link wp-element-button">Label</a>
-       </div>
-       <!-- /wp:button -->
-     </div>
-     <!-- /wp:buttons -->
-
-   This puts ds-btn as a direct parent of the <a>, so
-   ".ds-btn .wp-block-button__link" resolves correctly.
+   Prefixing with "body" adds one extra specificity point which
+   beats Twenty Twenty-Five's global styles on the frontend.
+   The !important handles the editor where global styles are
+   injected inline and can't be beaten by specificity alone.
    ============================================================ */
 
-/* Direct parent selector — works regardless of theme load order */
-.ds-btn .wp-block-button__link,
-.ds-btn .wp-element-button {
+body .ds-btn .wp-block-button__link,
+body .ds-btn .wp-element-button {
 	background:      var(--ds-colour-brand) !important;
 	color:           #ffffff !important;
 	border-color:    var(--ds-colour-brand) !important;
@@ -184,8 +173,8 @@
 	display:         inline-block !important;
 }
 
-.ds-btn .wp-block-button__link:hover,
-.ds-btn .wp-element-button:hover {
+body .ds-btn .wp-block-button__link:hover,
+body .ds-btn .wp-element-button:hover {
 	filter:       brightness(0.88) !important;
 	color:        #ffffff !important;
 	border-color: var(--ds-colour-brand) !important;
