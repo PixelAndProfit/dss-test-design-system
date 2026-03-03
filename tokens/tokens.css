@@ -1,430 +1,6 @@
-
-
-1) Plugin goal (single sentence) Build a WordPress plugin that syncs a Design System repo from GitHub into WordPress by importing Block Patterns and enqueuing Design Tokens CSS, with a simple admin UI for configuration + manual sync, plus optional scheduled sync. 2) Scope (MVP vs Phase 2) MVP (shi
-
-pasted
-
-Can you make this?
-
-23:01
-
-Check available skills
-Check available skills
-I'll build the complete plugin now. Let me create all the files systematically.
-
-
-Created 30 files, ran a command
-Created 30 files, ran a command
-Now let me create the example design system files:
-
-
-Created 4 files, ran a command
-Created 4 files, ran a command
-Now zip it up and move to outputs:
-
-
-Ran 2 commands, read a file
-Ran 2 commands, read a file
-Here's the complete plugin — ready to install. Everything from the spec is implemented:
-
-What's inside:
-
-design-system-sync.php — plugin header + bootstrap
-includes/ — all 18 PHP classes across helpers, core, GitHub integration, sync, WordPress layer, and admin
-assets/admin/ — CSS (card-based UI with status sidebar) + JS (sync button spinner)
-example-design-system/ — a working tokens.css + 3 block patterns (hero, feature-grid, cta) you can push to your repo to test against
-To install: Upload the zip via Plugins → Add New → Upload, then go to Tools → Design System Sync.
-
-One note on PHP version: The spec targets PHP 7.4+, so I replaced str_ends_with() (PHP 8 only) with a DSS_Utils::ends_with() helper throughout — it'll work on 7.4 and 8.x.
-
-What's production-ready in this build:
-
-PAT encrypted with AES-256-CBC keyed from WP salts
-All admin actions gated by manage_options + nonce
-Meaningful error messages for 401 (bad PAT), 403 (rate limit), 404 (wrong path)
-SHA-based change detection (won't re-sync unchanged repos)
-Tokens versioned by SHA for automatic cache-busting
-Old token files cleaned up on each sync
-Patterns registered from DB on init — zero GitHub calls on page load
-Design system sync
-ZIP 
-can you make it so that its attributed to Get Found Locally and not Q digital
-
-23:21
-
-Edited 2 files, ran a command, read a file
-Edited 2 files, ran a command, read a file
-Done — the plugin header now reads Author: Get Found Locally and the readme contributor slug is updated to getfoundlocally.
-
-Design system sync
-ZIP 
-In the HTML you pasted, there is no <link rel="stylesheet" ...tokens...> anywhere in the <head>.
-So what’s happening is:
-* ✅ Patterns are importing + inserting fine (we can see your ds-section ds-card ds-accent ds-btn classes in the content)
-* ❌ Your tokens CSS is not being enqueued on the front-end
-* ✅ The button looking “styled” is just the Twenty Twenty-Five theme’s default button styles, not your ds-btn rule
-That explains why you’re not seeing hot pink: the .ds-accent { color: var(--ds-colour-brand); } rule is never loaded.
-What to fix in your plugin (front-end + editor enqueue)
-You need to enqueue the saved tokens CSS file on:
-1. Front-end: wp_enqueue_scripts
-2. Block editor: enqueue_block_editor_assets
-Minimal, reliable enqueue code
-Add something like this in your plugin (where you bootstrap hooks):
-
-add_action('wp_enqueue_scripts', function () {
-    dss_enqueue_tokens_css();
-});
-
-add_action('enqueue_block_editor_assets', function () {
-    dss_enqueue_tokens_css(true);
-});
-
-function dss_enqueue_tokens_css($is_editor = false) {
-    $settings = get_option('dss_settings', []);
-    $tokens_url = $settings['tokens_url'] ?? '';
-    $sha = $settings['last_sha'] ?? '';
-
-    if (!$tokens_url) {
-        return; // nothing to load yet
-    }
-
-    $handle = $is_editor ? 'dss-tokens-editor' : 'dss-tokens';
-
-    // Cache-bust hard using SHA (or time if missing)
-    $ver = $sha ?: (string) time();
-
-    wp_enqueue_style($handle, $tokens_url, [], $ver);
-}
-What this does
-* Pulls the tokens_url your sync stored
-* Adds a proper stylesheet <link> tag on front-end and editor
-* Uses SHA for cache-busting
-If you are enqueuing but tokens_url is blank
-Your earlier screenshot showed Tokens URL = “Not synced yet” even after a successful run.
-That suggests your sync process might:
-* download tokens
-* maybe store them
-* but not persist the resulting URL into dss_settings['tokens_url']
-Fix: ensure you save the URL after writing the file
-When you store the tokens file in uploads, do something like:
-
-$settings = get_option('dss_settings', []);
-$settings['tokens_url'] = $public_url_to_tokens_css;
-$settings['last_sha']   = $sha;
-$settings['last_sync']  = time();
-update_option('dss_settings', $settings, false);
-If you don’t set tokens_url, the enqueue function has nothing to load.
-Quick confirmation test (after you patch)
-After patch + sync:
-1. Open the front-end page again
-2. View source
-3. Search for dss-tokens or tokens.
-You should see something like:
-
-<link rel='stylesheet' id='dss-tokens-css' href='https://workfromhomesetups.com/wp-content/uploads/design-system/tokens.<sha>.css?ver=<sha>' media='all' />
-Then your .ds-accent heading should go hot pink.
-One more gotcha: Twenty Twenty-Five might override your button background
-Even after tokens load, your .ds-btn a { background: var(--ds-colour-brand); } can lose to theme CSS depending on specificity/order.
-To make your test bulletproof, change your rule temporarily to:
-
-.ds-btn .wp-element-button,
-.ds-btn .wp-block-button__link{
-  background: var(--ds-colour-brand) !important;
-}
-(Only for testing — then you can remove !important and tune specificity properly.)
-
-Show more
-10:12
-Looking at the plugin code, the enqueue logic is already there in DSS_Assets — but the bug is almost certainly that tokens_url isn't being persisted back into dss_settings after sync. Let me fix both issues.
-
-
-Viewed 2 files
-Viewed 2 files
-Found it. `settings` is passed by reference and `tokens_url` is set on it — but in the runner, `DSS_Options::update_settings( $settings )` is only called at step 6, *after* both sync steps. That's fine in theory, but `DSS_Options::update_settings` calls `wp_parse_args` which merges into the *current stored option* fresh from the DB — potentially overwriting the `tokens_url` that was set on the local ` settings` variable if the stored copy still has the old value.
-
-The real fix: write tokens_url (and last_sha) in a single explicit update_option call that doesn't re-read from DB.
-
-
-Edited 2 files
-Edited 2 files
-Now fix the enqueue — the existing DSS_Assets class already hooks into wp_enqueue_scripts and enqueue_block_editor_assets, but let's make the enqueue function more defensive and add explicit debug logging to the admin status so you can immediately see if tokens_url is blank post-sync:
-
-
-Make enqueue more defensive and use distinct handles for frontend vs editor
-Make enqueue more defensive and use distinct handles for frontend vs editor
-Now update the status box to show the raw tokens_url value so you can immediately diagnose if it's blank after a sync:
-
-
-Improve status box to show tokens URL more clearly for debugging
-Improve status box to show tokens URL more clearly for debugging
-Also add a "force re-sync" escape hatch — a button to clear the stored SHA so the next sync is forced even if nothing changed on GitHub (useful when debugging):
-
-
-Add force re-sync action handler
-Add force re-sync action handler
-Add the force re-sync button to the settings page:
-
-
-Edited a file, ran a command, read a file
-Edited a file, ran a command, read a file
-Three fixes in this build:
-
-Root cause fix — tokens_url getting clobbered: The runner now writes the full $settings array (which includes tokens_url set by the tokens step) directly via update_option() instead of going through update_settings(). The old path re-read from the DB via wp_parse_args, which could overwrite the freshly-set tokens_url before it ever got saved.
-
-Enqueue fix: enqueue_tokens_frontend() and enqueue_tokens_editor() now read directly from get_option() (bypassing any caching in DSS_Options::get_settings()) and use distinct handles (dss-tokens vs dss-tokens-editor) so both can load independently.
-
-Status box + force re-sync: The admin now shows a red warning if tokens_url is blank, plus a "Force re-sync (clear SHA)" button — hit that first after installing the update so the SHA check doesn't short-circuit and you get a clean run.
-
-Design system sync
-ZIP 
-1772579922985_image.png
-I got this error
-
-10:18
-The sync says "Sync complete. 3 pattern(s) imported. Tokens updated." — so GitHub fetch and file write worked. But tokens_url is still blank after the run, which means the URL is being written to disk but not surviving into the DB.
-
-The culprit is almost certainly DSS_Admin_Settings::sanitize_settings(). When WordPress processes the settings form save (or any option update), it runs the registered sanitize callback — and that callback explicitly resets tokens_url to whatever is currently in the DB:
-
-php
-$out['tokens_url'] = (string) ( $current['tokens_url'] ?? '' );
-If the settings form was saved after the sync wrote tokens_url, the sanitizer fires and overwrites it with the old (blank) value. The fix is to stop running sync-written fields through the settings sanitizer entirely by using a separate option key for runtime state vs user-configured settings.
-
-
-Check options class
-Check options class
-The fix: split into two separate options — dss_settings for user config (what the form touches), and dss_sync_state for runtime data (SHA, tokens_url, last_sync). The sanitizer can never touch sync state because it lives in a completely different option.
-
-
-Created a file, ran a command
-Created a file, ran a command
-Now update the sync runner to read config + state separately and write only to sync state:
-
-
-Ran 2 commands
-Ran 2 commands
-Now update patterns sync to use $config instead of $settings:
-
-
-Update patterns sync signature
-Update patterns sync signature
-Good. Now update the admin settings sanitizer to only touch config fields (never sync state):
-
-
-Rewrite settings sanitizer to only touch config fields
-Rewrite settings sanitizer to only touch config fields
-Update assets enqueue and status box to read from the new sync state option:
-
-
-Ran 2 commands
-Ran 2 commands
-Also update the reset SHA action to clear sync state, not settings:
-
-
-Fix reset SHA to write to sync state not settings
-Fix reset SHA to write to sync state not settings
-Also update uninstall to clean up the new option key:
-
-
-Edited a file, ran a command, read a file
-Edited a file, ran a command, read a file
-This was a proper architectural bug, not just a missing line. Here's what was happening:
-
-Root cause: dss_settings was registered with WordPress via register_setting(), which means any time WordPress processes that option — including on settings page saves — it runs sanitize_settings(). That sanitizer re-read tokens_url from the current DB value before the sync had a chance to write it, then persisted the blank value back, clobbering whatever the sync had just stored.
-
-The fix: Split into two completely separate DB options:
-
-dss_settings — user config only (repo, branch, PAT, paths). The sanitizer only touches these fields now.
-dss_sync_state — runtime data (last_sha, last_sync, tokens_url). Never registered with register_setting(), so WordPress can never sanitize/overwrite it.
-After installing this update: Hit "Force re-sync (clear SHA)" first, then "Sync now". The Tokens URL in the status panel should go green, and you should see the <link ... tokens.css ...> tag in your page source.
-
-Design system sync
-ZIP 
-Screenshot 2026-03-04 102401.png
-Screenshot 2026-03-04 102453.png
-Nice — and this backend screenshot tells us something important:
-✅ Editor is loading your tokens (heading is hot pink) ❌ Your button is still black in the editor, even though it was hot pink on the front-end earlier.
-That means you’ve got editor CSS parity issues, not a sync issue.
-In plain terms:
-* Front-end has something (either your tokens CSS loaded later, or higher specificity, or different button markup/styles) that makes the button go pink.
-* Editor has stronger default button styles from core/theme that are overriding your .ds-btn a rule.
-Let’s fix it properly (without making a mess).
-Why this happens
-In the editor, WordPress applies strong rules like:
-* .wp-element-button / .wp-block-button__link styles
-* Theme “global styles” (inlined) that can override your custom CSS
-Your current selector:
-
-.ds-btn a { background: var(--ds-colour-brand); }
-…is too weak in the editor because:
-* the button isn’t “just an <a>” — it’s usually .wp-block-button__link.wp-element-button
-* the editor styles often win by specificity and/or load order.
-Fix: target the actual button classes (recommended)
-Update your tokens CSS to include these selectors:
-
-/* Buttons (front-end + editor parity) */
-.ds-btn .wp-block-button__link,
-.ds-btn .wp-element-button,
-.ds-btn .wp-block-button__link.wp-element-button{
-  background: var(--ds-colour-brand);
-  color: #fff;
-  border-radius: 10px;
-  text-decoration: none;
-}
-
-/* Optional: hover */
-.ds-btn .wp-block-button__link:hover,
-.ds-btn .wp-element-button:hover{
-  filter: brightness(0.95);
-}
-This usually fixes editor parity without !important.
-If the editor STILL forces black (common with some themes)
-Add a scoped, minimal !important just for background colour:
-
-.ds-btn .wp-block-button__link,
-.ds-btn .wp-element-button{
-  background: var(--ds-colour-brand) !important;
-}
-That’s an acceptable “surgical !important” because button backgrounds are the most commonly overridden thing in Gutenberg.
-Make it even cleaner: add a scope wrapper
-If you want to avoid !important entirely, increase specificity by scoping patterns:
-1) In patterns, wrap the whole pattern in:
-ds-scope
-Example group class:
-* ds-scope ds-section ds-card
-2) In CSS:
-
-.ds-scope .ds-btn .wp-block-button__link,
-.ds-scope .ds-btn .wp-element-button{
-  background: var(--ds-colour-brand);
-}
-This beats most theme defaults without resorting to !important.
-Your next steps (do this in order)
-1. Update tokens/tokens.css in GitHub with the improved button selectors above
-2. Commit
-3. Sync in WP
-4. Hard refresh the editor page (Cmd+Shift+R)
-5. Confirm the button goes pink in the editor too
-Bonus: confirm editor tokens are enqueued correctly
-If you ever want to be 100% sure:
-* Open DevTools while editing
-* Search the loaded stylesheets for tokens. and confirm it exists in the editor context
-
-Show more
-10:26
-Those screenshots are great news — the plugin is fully working! Tokens loading front-end and editor, both showing hot pink headings. The button black-in-editor issue is purely a CSS specificity problem, nothing to do with the plugin.
-
-This is a design system CSS fix, not a plugin fix. You just need to update your tokens.css in GitHub with stronger button selectors. Here's exactly what to add:
-
-
-Check end of example tokens file
-Check end of example tokens file
-The issue is clear — your tokens.css only has :root {} custom properties, no component-level rules at all. The .ds-btn, .ds-accent etc. selectors need to live in this file too. Let me create a proper, complete tokens.css that covers both the variables and the utility classes, with editor-safe button selectors:
-
-
-Ran 2 commands, read a file
-Ran 2 commands, read a file
-Here's the updated tokens.css — drop this into /tokens/tokens.css in your GitHub repo, commit, then hit Sync Now.
-
-What changed and why:
-
-The file now has two sections. Section 1 is the :root {} custom properties (unchanged in purpose). Section 2 is the utility classes that actually consume those variables — this is what was missing.
-
-The button fix specifically targets all the ways WordPress renders a button:
-
-css
-.ds-btn .wp-block-button__link,   /* Gutenberg block class */
-.ds-btn .wp-element-button,        /* Theme.json element class */
-.ds-btn a                          /* Fallback bare link */
-The !important on the button rules is intentional and appropriate here — WordPress core and theme global styles inject their button colours with high specificity, and this is the standard way to override them reliably. Once you lock in your design system as the authority on button colours, you can tune specificity more precisely, but !important scoped to .ds-btn is a safe and common pattern.
-
-After syncing, both the editor and front-end should show matching pink buttons.
-
-Tokens
-Code · CSS 
-
-Yep — that’s the right fix, and you’ve accidentally built the correct shape of a design-system file: tokens (variables) + utilities (classes) + editor/front-end parity. Nicely done. Here’s how I’d tighten this up so it stays maintainable when you move past “hot pink demo” into “real system used acr
-
-pasted
-
-10:37
-Good feedback. Let me implement all of it — refined button specificity, container utility, ds-scope typography, pattern metadata parsing, and the health panel.
-
-
-Write refined tokens.css
-Write refined tokens.css
-Now update the example patterns to use ds-scope, ds-container, and the metadata comment header:
-
-
-Update all example patterns with metadata comments and ds-scope/ds-container
-Update all example patterns with metadata comments and ds-scope/ds-container
-Now implement pattern metadata parsing in the sync class:
-
-
-Rewrite patterns sync with metadata comment parsing
-Rewrite patterns sync with metadata comment parsing
-Update the pattern registry to use the richer metadata:
-
-
-Update pattern registry to use full metadata
-Update pattern registry to use full metadata
-Now build the health panel as a proper partial:
-
-
-Create health panel partial
-Create health panel partial
-Add the health panel to the settings page and add CSS for it:
-
-
-Ran 2 commands, edited a file, read a file
-Ran 2 commands, edited a file, read a file
-Two deliverables — updated plugin zip and the new tokens.css to push to your GitHub repo.
-
-What changed:
-
-tokens.css — now has 7 clearly labelled sections. The button fix uses two layers: Layer A is .ds-scope .ds-btn (scoped, no !important, wins via specificity), Layer B is the minimal editor override patch (only background and color get !important, nothing else). Also added --ds-max-width + .ds-container and .ds-scope typography base.
-
-Pattern metadata — your .html files can now have a comment header at the top:
-
-html
-<!--
-title: My Pattern
-slug: ds/my-pattern
-categories: design-system, featured
-keywords: hero, banner
-description: A full-width hero section.
--->
-The sync parser strips this before registering the pattern with WordPress, so it's invisible to the editor. All four example patterns are updated to use this format.
-
-Health panel — new card in the admin sidebar with 5 live checks: settings configured, sync has run, tokens URL set, tokens file actually exists on disk, and patterns stored. Shows the enqueue handle names so you can quickly verify in DevTools.
-
-What to do now: push tokens.css to GitHub, then Force re-sync → Sync now.
-
-Design system sync
-ZIP 
-Tokens
-Code · CSS 
-
-
-Want to be notified when Claude responds?
-
-
-
-Claude is AI and can make mistakes. Please double-check responses.
-Tokens · CSS
-Copy
-
 /**
  * Design System — tokens/tokens.css
  * Pulled into WordPress via Design System Sync.
- *
- * Structure:
- *  1. Custom properties (:root)
- *  2. Scope + typography base
- *  3. Layout utilities
- *  4. Buttons (scoped first, editor-override patch second)
- *  5. Surface utilities
- *  6. Text / colour helpers
- *  7. Spacing helpers
  */
 
 /* ============================================================
@@ -503,7 +79,7 @@ Copy
 	--ds-shadow-xl:  0 20px 25px -5px rgba(0,0,0,.1), 0 10px 10px -5px rgba(0,0,0,.04);
 
 	/* ── Layout ──────────────────────────────────────────── */
-	--ds-max-width:  1100px;
+	--ds-max-width: 1100px;
 
 	/* ── Transitions ─────────────────────────────────────── */
 	--ds-transition-fast:   150ms ease;
@@ -514,9 +90,7 @@ Copy
 
 /* ============================================================
    2. SCOPE + TYPOGRAPHY BASE
-   Add class "ds-scope" to the outermost wrapper of any section
-   that should use the design system. Gives you consistent
-   typography and a namespace for specificity without !important.
+   Add "ds-scope" to the outermost wrapper of any DS section.
    ============================================================ */
 
 .ds-scope {
@@ -544,25 +118,17 @@ Copy
    3. LAYOUT UTILITIES
    ============================================================ */
 
-/* Vertical section padding */
 .ds-section {
 	padding-top:    var(--ds-space-20);
 	padding-bottom: var(--ds-space-20);
 }
 
-/* Centred, max-width content column */
 .ds-container {
 	max-width:      var(--ds-max-width);
 	margin-inline:  auto;
 	padding-inline: var(--ds-space-6);
 }
 
-/* Recommended pattern nesting:
-   outer group → ds-scope ds-section
-   inner group → ds-container
-   cards       → ds-card             */
-
-/* Card surface */
 .ds-card {
 	background:    var(--ds-colour-bg);
 	border:        1px solid var(--ds-colour-border);
@@ -571,14 +137,12 @@ Copy
 	padding:       var(--ds-space-8);
 }
 
-/* Divider */
 .ds-divider {
 	border:     none;
 	border-top: 1px solid var(--ds-colour-border);
 	margin:     var(--ds-space-8) 0;
 }
 
-/* Gap helpers */
 .ds-gap-sm { gap: var(--ds-space-4); }
 .ds-gap-md { gap: var(--ds-space-8); }
 .ds-gap-lg { gap: var(--ds-space-12); }
@@ -586,36 +150,45 @@ Copy
 
 /* ============================================================
    4. BUTTONS
-   Layer A — scoped (preferred, no !important needed)
-   Layer B — editor override patch (minimal !important)
+   ─────────────────────────────────────────────────────────────
+   HOW TO USE IN PATTERNS:
+   Put "ds-btn" on the wp:button block itself (the inner div),
+   NOT on wp:buttons (the outer wrapper).
+
+   Pattern HTML should look like:
+     <!-- wp:buttons -->
+     <div class="wp-block-buttons">
+       <!-- wp:button {"className":"ds-btn"} -->
+       <div class="wp-block-button ds-btn">
+         <a class="wp-block-button__link wp-element-button">Label</a>
+       </div>
+       <!-- /wp:button -->
+     </div>
+     <!-- /wp:buttons -->
+
+   This puts ds-btn as a direct parent of the <a>, so
+   ".ds-btn .wp-block-button__link" resolves correctly.
    ============================================================ */
 
-/* A: Scoped — wins over theme defaults via specificity */
-.ds-scope .ds-btn .wp-block-button__link,
-.ds-scope .ds-btn .wp-element-button,
-.ds-scope .ds-btn a {
-	background:      var(--ds-colour-brand);
-	color:           #fff;
-	border:          none;
-	border-radius:   var(--ds-radius-full);
-	padding:         var(--ds-space-3) var(--ds-space-6);
-	font-weight:     var(--ds-weight-semibold);
-	text-decoration: none;
-	transition:      filter var(--ds-transition-fast);
-}
-
-.ds-scope .ds-btn .wp-block-button__link:hover,
-.ds-scope .ds-btn .wp-element-button:hover,
-.ds-scope .ds-btn a:hover {
-	filter: brightness(0.9);
-	color:  #fff;
-}
-
-/* B: Editor override patch — only what Gutenberg forces us to override */
+/* Direct parent selector — works regardless of theme load order */
 .ds-btn .wp-block-button__link,
 .ds-btn .wp-element-button {
-	background: var(--ds-colour-brand) !important;
-	color:      #fff !important;
+	background:      var(--ds-colour-brand) !important;
+	color:           #ffffff !important;
+	border-color:    var(--ds-colour-brand) !important;
+	border-radius:   var(--ds-radius-full) !important;
+	padding:         0.6em 1.4em !important;
+	font-weight:     var(--ds-weight-semibold) !important;
+	text-decoration: none !important;
+	transition:      filter var(--ds-transition-fast) !important;
+	display:         inline-block !important;
+}
+
+.ds-btn .wp-block-button__link:hover,
+.ds-btn .wp-element-button:hover {
+	filter:       brightness(0.88) !important;
+	color:        #ffffff !important;
+	border-color: var(--ds-colour-brand) !important;
 }
 
 
@@ -642,13 +215,8 @@ Copy
 	color: var(--ds-colour-brand);
 }
 
-.ds-text-brand  { color: var(--ds-colour-brand); }
-.ds-text-muted  { color: var(--ds-colour-text-muted); }
-.ds-text-small  { font-size: var(--ds-text-sm); }
-.ds-text-large  { font-size: var(--ds-text-lg); }
-.ds-text-xl     { font-size: var(--ds-text-xl); }
-
-
-
-
-
+.ds-text-brand { color: var(--ds-colour-brand); }
+.ds-text-muted { color: var(--ds-colour-text-muted); }
+.ds-text-small { font-size: var(--ds-text-sm); }
+.ds-text-large { font-size: var(--ds-text-lg); }
+.ds-text-xl    { font-size: var(--ds-text-xl); }
