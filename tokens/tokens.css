@@ -1,14 +1,191 @@
-:root{
-  --ds-space-1: 8px;
-  --ds-space-2: 16px;
-  --ds-radius-1: 12px;
-  --ds-colour-brand: #ff00ff;
-  --ds-colour-ink: #111827;
-  --ds-max-width: 1100px;
+/**
+ * Design System Tokens + Utility Classes
+ * Synced into WordPress via Design System Sync.
+ *
+ * This file does two things:
+ *  1. Defines CSS custom properties (variables) in :root
+ *  2. Defines utility classes that consume those variables
+ *
+ * Both sections are enqueued on frontend AND in the block editor,
+ * so what you see in the editor matches the front-end exactly.
+ */
+
+/* ============================================================
+   1. CUSTOM PROPERTIES (tokens)
+   ============================================================ */
+
+:root {
+	/* ── Brand colours ───────────────────────────────────── */
+	--ds-colour-brand:        #ff00cc;   /* hot pink — change this to your brand */
+	--ds-colour-brand-dark:   #cc00a3;
+	--ds-colour-brand-light:  #ff66dd;
+	--ds-colour-brand-subtle: #fff0fb;
+
+	/* ── Neutrals ────────────────────────────────────────── */
+	--ds-colour-text:         #1a1a1a;
+	--ds-colour-text-muted:   #555555;
+	--ds-colour-border:       #e2e8f0;
+	--ds-colour-bg:           #ffffff;
+	--ds-colour-bg-subtle:    #f8fafc;
+
+	/* ── Semantic ────────────────────────────────────────── */
+	--ds-colour-success:      #16a34a;
+	--ds-colour-warning:      #d97706;
+	--ds-colour-error:        #dc2626;
+
+	/* ── Typography ─────────────────────────────────────── */
+	--ds-font-sans:   'Inter', system-ui, -apple-system, sans-serif;
+	--ds-font-serif:  Georgia, 'Times New Roman', serif;
+	--ds-font-mono:   'Fira Code', 'Cascadia Code', monospace;
+
+	--ds-text-xs:     0.75rem;
+	--ds-text-sm:     0.875rem;
+	--ds-text-base:   1rem;
+	--ds-text-lg:     1.125rem;
+	--ds-text-xl:     1.25rem;
+	--ds-text-2xl:    1.5rem;
+	--ds-text-3xl:    1.875rem;
+	--ds-text-4xl:    2.25rem;
+	--ds-text-5xl:    3rem;
+
+	--ds-weight-normal:   400;
+	--ds-weight-medium:   500;
+	--ds-weight-semibold: 600;
+	--ds-weight-bold:     700;
+
+	--ds-leading-tight:   1.25;
+	--ds-leading-normal:  1.5;
+	--ds-leading-loose:   1.75;
+
+	/* ── Spacing ─────────────────────────────────────────── */
+	--ds-space-1:   0.25rem;
+	--ds-space-2:   0.5rem;
+	--ds-space-3:   0.75rem;
+	--ds-space-4:   1rem;
+	--ds-space-5:   1.25rem;
+	--ds-space-6:   1.5rem;
+	--ds-space-8:   2rem;
+	--ds-space-10:  2.5rem;
+	--ds-space-12:  3rem;
+	--ds-space-16:  4rem;
+	--ds-space-20:  5rem;
+	--ds-space-24:  6rem;
+
+	/* ── Border radius ───────────────────────────────────── */
+	--ds-radius-sm:   4px;
+	--ds-radius-md:   8px;
+	--ds-radius-lg:   12px;
+	--ds-radius-xl:   16px;
+	--ds-radius-2xl:  24px;
+	--ds-radius-full: 9999px;
+
+	/* ── Shadows ─────────────────────────────────────────── */
+	--ds-shadow-sm:  0 1px 2px rgba(0,0,0,.05);
+	--ds-shadow-md:  0 4px 6px -1px rgba(0,0,0,.1), 0 2px 4px -1px rgba(0,0,0,.06);
+	--ds-shadow-lg:  0 10px 15px -3px rgba(0,0,0,.1), 0 4px 6px -2px rgba(0,0,0,.05);
+	--ds-shadow-xl:  0 20px 25px -5px rgba(0,0,0,.1), 0 10px 10px -5px rgba(0,0,0,.04);
+
+	/* ── Transitions ─────────────────────────────────────── */
+	--ds-transition-fast:   150ms ease;
+	--ds-transition-normal: 250ms ease;
+	--ds-transition-slow:   400ms ease;
 }
 
-.ds-section{max-width:var(--ds-max-width);margin-inline:auto;padding:var(--ds-space-2);}
-.ds-card{border-radius:var(--ds-radius-1);border:1px solid rgba(0,0,0,.12);padding:var(--ds-space-2);background:#fff;}
-.ds-accent{color:var(--ds-colour-brand);}
-.ds-muted{color:rgba(17,24,39,.75);}
-.ds-btn a{background:var(--ds-colour-brand);color:#fff;padding:10px 14px;border-radius:10px;text-decoration:none;display:inline-block;}
+
+/* ============================================================
+   2. UTILITY CLASSES
+   These are the classes you add to block "Additional CSS class"
+   in the editor (or hardcode into pattern HTML).
+   ============================================================ */
+
+/* ── Accent colour (headings, text) ─────────────────────── */
+
+.ds-accent,
+.ds-accent h1,
+.ds-accent h2,
+.ds-accent h3,
+.ds-accent h4,
+.ds-accent h5,
+.ds-accent h6 {
+	color: var(--ds-colour-brand);
+}
+
+/* ── Section padding ─────────────────────────────────────── */
+
+.ds-section {
+	padding-top:    var(--ds-space-20);
+	padding-bottom: var(--ds-space-20);
+}
+
+/* ── Card surface ────────────────────────────────────────── */
+
+.ds-card {
+	background:    var(--ds-colour-bg);
+	border:        1px solid var(--ds-colour-border);
+	border-radius: var(--ds-radius-xl);
+	box-shadow:    var(--ds-shadow-sm);
+	padding:       var(--ds-space-8);
+}
+
+/* ── Buttons
+     Target both the WP block button classes AND bare <a> tags
+     so this works in the block editor AND on the front-end.
+   ──────────────────────────────────────────────────────────── */
+
+.ds-btn .wp-block-button__link,
+.ds-btn .wp-element-button,
+.ds-btn .wp-block-button__link.wp-element-button,
+.ds-btn a {
+	background:      var(--ds-colour-brand) !important;
+	color:           #ffffff !important;
+	border:          none !important;
+	border-radius:   var(--ds-radius-full) !important;
+	padding:         var(--ds-space-3) var(--ds-space-6) !important;
+	font-weight:     var(--ds-weight-semibold) !important;
+	text-decoration: none !important;
+	transition:      filter var(--ds-transition-fast) !important;
+}
+
+.ds-btn .wp-block-button__link:hover,
+.ds-btn .wp-element-button:hover,
+.ds-btn a:hover {
+	filter: brightness(0.9) !important;
+	color:  #ffffff !important;
+}
+
+/* ── Scoped brand button (higher specificity, no !important needed) */
+
+.ds-scope .ds-btn .wp-block-button__link,
+.ds-scope .ds-btn .wp-element-button {
+	background:    var(--ds-colour-brand);
+	color:         #ffffff;
+	border-radius: var(--ds-radius-full);
+}
+
+/* ── Typography helpers ──────────────────────────────────── */
+
+.ds-text-brand  { color: var(--ds-colour-brand); }
+.ds-text-muted  { color: var(--ds-colour-text-muted); }
+.ds-text-small  { font-size: var(--ds-text-sm); }
+.ds-text-large  { font-size: var(--ds-text-lg); }
+.ds-text-xl     { font-size: var(--ds-text-xl); }
+
+/* ── Background helpers ──────────────────────────────────── */
+
+.ds-bg-brand    { background: var(--ds-colour-brand); color: #fff; }
+.ds-bg-subtle   { background: var(--ds-colour-bg-subtle); }
+.ds-bg-white    { background: var(--ds-colour-bg); }
+
+/* ── Spacing helpers ─────────────────────────────────────── */
+
+.ds-gap-sm  { gap: var(--ds-space-4); }
+.ds-gap-md  { gap: var(--ds-space-8); }
+.ds-gap-lg  { gap: var(--ds-space-12); }
+
+/* ── Divider ─────────────────────────────────────────────── */
+
+.ds-divider {
+	border: none;
+	border-top: 1px solid var(--ds-colour-border);
+	margin: var(--ds-space-8) 0;
+}
