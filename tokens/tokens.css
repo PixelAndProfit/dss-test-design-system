@@ -1,0 +1,14 @@
+:root{
+  --ds-space-1: 8px;
+  --ds-space-2: 16px;
+  --ds-radius-1: 12px;
+  --ds-colour-brand: #0A63B3;
+  --ds-colour-ink: #111827;
+  --ds-max-width: 1100px;
+}
+
+.ds-section{max-width:var(--ds-max-width);margin-inline:auto;padding:var(--ds-space-2);}
+.ds-card{border-radius:var(--ds-radius-1);border:1px solid rgba(0,0,0,.12);padding:var(--ds-space-2);background:#fff;}
+.ds-accent{color:var(--ds-colour-brand);}
+.ds-muted{color:rgba(17,24,39,.75);}
+.ds-btn a{background:var(--ds-colour-brand);color:#fff;padding:10px 14px;border-radius:10px;text-decoration:none;display:inline-block;}
